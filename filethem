@@ -1,0 +1,109 @@
+#!/usr/bin/perl
+###############################################################################
+# Quick script to file things away into there correct folders                 #
+# September 2013                                                              #
+#									      #
+# usage is sudo filethem to actually do the business of filethem -testing for #
+# for just seeing what will happen					      #
+###############################################################################
+use Getopt::Long;
+use strict;
+use warnings;
+use File::Copy qw(copy move);
+
+# default stuff
+my $testing = 0;
+my $result = GetOptions ("testing" => \$testing);
+
+print "We Are Just Testing\n\n" if ($testing);
+
+
+# ignore the following files and folders - don't try to move them!
+my @ignorefiles = qw(. .. iTunes mythtv iPlayer games images ISOs movies music software TV unsorted web filethem.pl);
+
+# this is where we are looking for new videos - should really make it a parameter?
+my $directory = "./";
+readfiles($directory);
+
+sub readfiles
+{
+	my $directory =  $_[0];
+	opendir my $dh, $directory or die $!;
+
+
+	while (my $file = readdir($dh)) {
+
+		# if it isn't in the list of ignored files/dirs then do something
+		if(!(grep $_ eq $file, @ignorefiles)) {
+			# if its a dir we need to do something different. Should ideally head into it and extract the file
+			if (-d ($file)) {
+				print "$file is a dir - recursing\n";
+				readfiles($file);
+				# still need to skip is as we shouldn't try to move a directory				
+				next;
+			}
+		
+			# split the filename into bits.
+			my @words = split/\./, $file;
+			my $wordCount = scalar @words;
+			my $folder = 'TV/';
+			my $episodeInfo = '';
+			my $season;
+			my $found = 0;
+			foreach (@words) {
+				# for episode info in the form S01E22		
+				if (!($found) && ($_ =~ m/[S|s](\d\d)[E|e](\d\d)/)){
+					# print "looks like SxxDyy\n" if ($testing);
+					$episodeInfo = $_;
+					$season = $1 + 0;
+					$found = 1;
+				} 
+				if (!($found) && ($_ =~ m/^(\d)(\d\d)$/)){
+					# print "looks like xyy\n" if ($testing);
+					# for episode info in the form 822
+					$episodeInfo = $_;
+					$season = $1 + 0;
+					$found = 1;
+				}
+
+				if ($episodeInfo eq '') {
+					$folder .= capitalise($_)."\.";
+				}
+			}
+			
+			if (!($found)) {
+				#print "No Episode info found\n";
+				next;
+			}
+
+			chop($folder);
+			$folder.="/Season $season/";
+
+		
+			my $destination = "$folder$file";
+		
+			print "$directory/$file should be moved to $folder -> ";
+			if (-d $folder) {
+				print "Move in progress. Please wait. -> ";
+				if (!$testing) {
+					move $directory."/".$file, $destination or die $!;
+				}
+				print "  Done.\n";
+			} else {
+				print "No such folder $folder\n";
+			}
+		}
+	}
+
+	closedir($dh);
+}
+# sub to do stuff...
+sub capitalise
+{
+	my $word = $_[0];
+	if ($word ne 'of') {
+		return ucfirst($word);
+	} else {
+		return $word;
+	}
+}
