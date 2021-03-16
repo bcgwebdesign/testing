@@ -9,9 +9,10 @@ button1 = Button(2)
 button2 = Button(3)
 slackit = True
 
-slack = slackweb.Slack(url="https://hooks.slack.com/services[INPUT YOUR OWN SLACK CHANNEL HERE]")
+slack = slackweb.Slack(url="https://hooks.slack.com/services/[insert own slack credentials here ")
 
 # time in seconds before doing something usually for just the 'open' state 
+# actually made this go up ^2 so 2 mins, then another 4 mins, then another 8 mins etc.
 reminder_time = 120
 
 # time between checks
@@ -91,13 +92,16 @@ def checkbutton(button_name, button, current_state, closed_time, opened_time):
 def run_reminders(name,state,duration,check,reminder_multiple):
 	# only really bother about the open state???
 	if state == 'open':
-		if duration > check * reminder_multiple:
+		if duration > check * pow(2,reminder_multiple):
+			nextone = check * pow(2,reminder_multiple + 1 )
+			print("Checking again in " + str(nextone) + " seconds")
 			sendSlack(name + ' has been ' + state + ' for ' + nicetime(duration))
+			sendSlack('Checking again in ' + nicetime(nextone))
 			return reminder_multiple + 1
 		else:
 			return reminder_multiple
 	else:
-		return 1
+		return 0
 
 sendSlack("Garage Monitoring restarted")
 
@@ -108,7 +112,7 @@ garage1_state = garage2_state = 'unknown'
 garage1_open_time = garage1_closed_time = datetime.now()
 garage2_open_time = garage2_closed_time = datetime.now()
 
-garage1_reminder_multiple = garage2_reminder_multiple = 1
+garage1_reminder_multiple = garage2_reminder_multiple = 0
 
 while True:
 
