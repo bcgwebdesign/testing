@@ -1,0 +1,123 @@
+#!/usr/bin/python
+from datetime import datetime
+from gpiozero import LED, Button
+from signal import pause
+from time import sleep
+import slackweb
+
+button1 = Button(2)
+button2 = Button(3)
+slackit = True
+
+slack = slackweb.Slack(url="https://hooks.slack.com/services[INPUT YOUR OWN SLACK CHANNEL HERE]")
+
+# time in seconds before doing something usually for just the 'open' state 
+reminder_time = 120
+
+# time between checks
+sleeptime = 2
+
+def sendSlack( message='default message'):
+	if slackit:
+		slack.notify(text=message, username="garage-sensors-pi", icon_emoji=":robot_face:")
+
+def nicetime(diff):
+	secs_per_min = 60
+	secs_per_hour = secs_per_min * 60
+	secs_per_day = secs_per_hour * 24
+
+	#if diff > secs_per_day:
+	days = divmod(diff,secs_per_day)
+	hours = divmod(days[1],secs_per_hour)
+	minutes = divmod(hours[1], secs_per_min)
+	seconds = minutes[1]
+
+	if diff > secs_per_day:
+                return str(days[0]) + " days " + str(hours[0]) + " hours " + str(minutes[0]) + " minutes " + str(seconds) + " seconds"
+        if diff > secs_per_hour:
+                return str(hours[0]) + " hours " + str(minutes[0]) + " minutes " + str(seconds) + " seconds"
+        if diff > secs_per_min:
+                return str(minutes[0]) + " minutes " + str(seconds) + " seconds"
+        if diff <= secs_per_min:
+                return str(seconds) + " seconds"
+
+	
+	return str(days[0]) + " days " + str(hours[0]) + " hours " + str(minutes[0]) + " minutes " + str(seconds) + " seconds"
+
+
+def checkbutton(button_name, button, current_state, closed_time, opened_time):
+	
+	new_state = 'unknown'
+	now = datetime.now()
+
+	if button.is_pressed:
+		new_state = 'closed'
+	else:
+		new_state = 'open'
+
+	# something has changed
+	if current_state != new_state:
+
+		# has got from something to closed - how long was it open for
+		if new_state == 'closed':
+			closed_time = datetime.now()
+			difference = closed_time - opened_time
+
+		# has gone from something to open - take a note of the time
+		if new_state == 'open':
+			opened_time = datetime.now()
+			difference = opened_time - closed_time
+
+		difference = int(difference.total_seconds())
+
+
+		# output some stuff
+		str_now = now.strftime("%d/%m/%Y %H:%M:%S")
+		print(str_now + ' ' + button_name + ' changed to ' + new_state + ' after ' + nicetime(difference))
+		sendSlack(str_now + ' ' + button_name + ' changed to ' + new_state + ' after ' + nicetime(difference))
+
+		return new_state, closed_time, opened_time, 0
+	
+	# still at the same state
+	if current_state == 'closed':
+		duration = now - closed_time
+	else:
+		duration = now - opened_time		
+	
+	duration = int(duration.total_seconds())
+
+	return current_state, closed_time, opened_time, duration
+
+def run_reminders(name,state,duration,check,reminder_multiple):
+	# only really bother about the open state???
+	if state == 'open':
+		if duration > check * reminder_multiple:
+			sendSlack(name + ' has been ' + state + ' for ' + nicetime(duration))
+			return reminder_multiple + 1
+		else:
+			return reminder_multiple
+	else:
+		return 1
+
+sendSlack("Garage Monitoring restarted")
+
+
+
+
+garage1_state = garage2_state = 'unknown'
+garage1_open_time = garage1_closed_time = datetime.now()
+garage2_open_time = garage2_closed_time = datetime.now()
+
+garage1_reminder_multiple = garage2_reminder_multiple = 1
+
+while True:
+
+	garage1_state, garage1_closed_time, garage1_open_time, duration1 = checkbutton( "Left Garage", button1, garage1_state, garage1_closed_time, garage1_open_time)
+	garage2_state, garage2_closed_time, garage2_open_time, duration2 = checkbutton("Right Garage", button2, garage2_state, garage2_closed_time, garage2_open_time)
+
+
+	garage1_reminder_multiple = run_reminders("Left Garage", garage1_state, duration1, reminder_time, garage1_reminder_multiple)
+	garage2_reminder_multiple = run_reminders("Right Garage", garage2_state, duration2, reminder_time, garage2_reminder_multiple)
+
+
+	sleep(sleeptime)
