@@ -2,7 +2,7 @@
 
 Just my testing repo for now
 
-## garage_safe 
+## garage_safe DEPRECATED in favour of home assistant and all its magic
 After our garage door(s) being left open accidentally I re-purposed my Raspberry Pi Zero W to do a bit of work.
 
 Got a bunch of magnetic door position switches and wired it up without any issues.
